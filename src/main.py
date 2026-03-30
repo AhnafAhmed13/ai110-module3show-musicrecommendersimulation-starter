@@ -34,6 +34,58 @@ def main() -> None:
             target_danceability=0.35,
             target_tempo_bpm=75,
         ),
+        # --- Edge case / adversarial profiles ---
+        "Sad Gym Rat (mood not in catalog)": UserProfile(
+            favorite_genre="pop",
+            favorite_mood="sad",        # no song has mood="sad"
+            target_energy=0.9,
+            likes_acoustic=False,
+        ),
+        "Valence Contradiction (happy mood, dark valence)": UserProfile(
+            favorite_genre="indie pop",
+            favorite_mood="happy",
+            target_energy=0.76,
+            likes_acoustic=False,
+            target_valence=0.05,        # wants dark emotional tone
+            target_danceability=0.8,
+        ),
+        "Acoustic Energy Seeker (conflicting features)": UserProfile(
+            favorite_genre="rock",
+            favorite_mood="intense",
+            target_energy=0.91,
+            likes_acoustic=True,        # acoustic songs tend to be low energy
+            target_danceability=0.7,
+        ),
+        "Out-of-Range Energy (unclamped bug test)": UserProfile(
+            favorite_genre="ambient",
+            favorite_mood="chill",
+            target_energy=1.5,          # outside [0, 1] — was a negative-score bug
+            likes_acoustic=True,
+        ),
+        "Genre Hermit (nothing in catalog matches)": UserProfile(
+            favorite_genre="classical",  # not in catalog
+            favorite_mood="peaceful",    # not in catalog
+            target_energy=0.3,
+            likes_acoustic=True,
+            target_valence=0.6,
+            target_tempo_bpm=80,
+        ),
+        "Everything Maxed (weight dominance test)": UserProfile(
+            favorite_genre="pop",
+            favorite_mood="happy",
+            target_energy=1.0,
+            likes_acoustic=False,
+            target_valence=1.0,
+            target_danceability=1.0,
+            target_tempo_bpm=200,       # beyond all songs in catalog
+        ),
+        "Tempo Punisher (extreme BPM silences tempo signal)": UserProfile(
+            favorite_genre="lofi",
+            favorite_mood="chill",
+            target_energy=0.35,
+            likes_acoustic=True,
+            target_tempo_bpm=300,       # all songs clamp to 0 tempo points
+        ),
     }
 
     for profile_name, profile in profiles.items():

@@ -48,6 +48,28 @@ class Recommender:
         # TODO: Implement explanation logic
         return "Explanation placeholder"
 
+# Related genres earn half the genre-match bonus (+1.0 instead of +2.0)
+GENRE_RELATED: Dict[str, set] = {
+    "pop":      {"indie pop", "synthwave"},
+    "indie pop": {"pop"},
+    "synthwave": {"pop", "rock"},
+    "rock":     {"synthwave"},
+    "lofi":     {"ambient", "jazz"},
+    "ambient":  {"lofi", "jazz"},
+    "jazz":     {"lofi", "ambient"},
+}
+
+# Related moods earn half the mood-match bonus (+0.75 instead of +1.5)
+MOOD_RELATED: Dict[str, set] = {
+    "happy":   {"relaxed"},
+    "relaxed": {"happy", "chill"},
+    "chill":   {"relaxed", "focused"},
+    "focused": {"chill"},
+    "intense": {"moody"},
+    "moody":   {"intense"},
+}
+
+
 def load_songs(csv_path: str) -> List[Dict]:
     """
     Loads songs from a CSV file.
@@ -73,8 +95,8 @@ def score_song(user: UserProfile, song: Dict) -> Tuple[float, List[str]]:
     Scores a single song against a UserProfile.
 
     Scoring recipe:
-      +2.0        genre match        (exact string, always applied)
-      +1.5        mood match         (exact string, always applied)
+      +2.0/+1.0   genre match        exact match +2.0, related genre +1.0 (always applied)
+      +1.5/+0.75  mood match         exact match +1.5, related mood +0.75 (always applied)
       0 – 1.0     energy proximity   1.0 - |target - song|  (always applied)
       0 – 1.0     valence proximity  1.0 - |target - song|  (only if target_valence set)
       0 – 0.75    danceability       (1.0 - |delta|) * 0.75 (only if target_danceability set)
@@ -88,18 +110,26 @@ def score_song(user: UserProfile, song: Dict) -> Tuple[float, List[str]]:
     score = 0.0
     reasons = []
 
-    # Genre match
-    if song.get("genre") == user.favorite_genre:
+    # Genre match (exact +2.0, related +1.0)
+    song_genre = song.get("genre")
+    if song_genre == user.favorite_genre:
         score += 2.0
         reasons.append("genre match (+2.0)")
+    elif song_genre in GENRE_RELATED.get(user.favorite_genre, set()):
+        score += 1.0
+        reasons.append(f"related genre '{song_genre}' (+1.0)")
 
-    # Mood match
-    if song.get("mood") == user.favorite_mood:
+    # Mood match (exact +1.5, related +0.75)
+    song_mood = song.get("mood")
+    if song_mood == user.favorite_mood:
         score += 1.5
         reasons.append("mood match (+1.5)")
+    elif song_mood in MOOD_RELATED.get(user.favorite_mood, set()):
+        score += 0.75
+        reasons.append(f"related mood '{song_mood}' (+0.75)")
 
     # Energy proximity (0–1.0)
-    pts = round(1.0 - abs(user.target_energy - float(song["energy"])), 2)
+    pts = round(max(1.0 - abs(user.target_energy - float(song["energy"])), 0.0), 2)
     score += pts
     reasons.append(f"energy proximity (+{pts:.2f})")
 
