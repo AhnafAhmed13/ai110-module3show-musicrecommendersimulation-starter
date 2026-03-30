@@ -68,20 +68,18 @@ def load_songs(csv_path: str) -> List[Dict]:
             songs.append(row)
     return songs
 
-def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
+def score_song(user: UserProfile, song: Dict) -> Tuple[float, List[str]]:
     """
-    Scores a single song against a user preference dictionary.
+    Scores a single song against a UserProfile.
 
-    Scoring recipe (all signals are optional — only applied when the key exists
-    in user_prefs):
-
-      +2.0        genre match        (exact string)
-      +1.5        mood match         (exact string)
-      0 – 1.0     energy proximity   1.0 - |target - song|
-      0 – 1.0     valence proximity  1.0 - |target - song|
-      0 – 0.75    danceability       (1.0 - |delta|) * 0.75
-      0 – 0.5     tempo proximity    (1.0 - |delta| / 150) * 0.5, clamped ≥ 0
-      +0.5/-0.25  acousticness       reward if likes_acoustic, penalize otherwise
+    Scoring recipe:
+      +2.0        genre match        (exact string, always applied)
+      +1.5        mood match         (exact string, always applied)
+      0 – 1.0     energy proximity   1.0 - |target - song|  (always applied)
+      0 – 1.0     valence proximity  1.0 - |target - song|  (only if target_valence set)
+      0 – 0.75    danceability       (1.0 - |delta|) * 0.75 (only if target_danceability set)
+      0 – 0.5     tempo proximity    (1.0 - |delta| / 150) * 0.5, clamped ≥ 0 (only if target_tempo_bpm set)
+      +0.5/-0.25  acousticness       reward if likes_acoustic, penalize otherwise (always applied)
 
     Returns:
         (score, reasons) where reasons is a list of human-readable strings
@@ -91,62 +89,60 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     reasons = []
 
     # Genre match
-    if song.get("genre") == user_prefs.get("genre"):
+    if song.get("genre") == user.favorite_genre:
         score += 2.0
         reasons.append("genre match (+2.0)")
 
     # Mood match
-    if song.get("mood") == user_prefs.get("mood"):
+    if song.get("mood") == user.favorite_mood:
         score += 1.5
         reasons.append("mood match (+1.5)")
 
     # Energy proximity (0–1.0)
-    if "energy" in user_prefs:
-        pts = round(1.0 - abs(user_prefs["energy"] - float(song["energy"])), 2)
-        score += pts
-        reasons.append(f"energy proximity (+{pts:.2f})")
+    pts = round(1.0 - abs(user.target_energy - float(song["energy"])), 2)
+    score += pts
+    reasons.append(f"energy proximity (+{pts:.2f})")
 
-    # Valence proximity (0–1.0)
-    if "valence" in user_prefs:
-        pts = round(1.0 - abs(user_prefs["valence"] - float(song["valence"])), 2)
+    # Valence proximity (0–1.0) — only if set
+    if user.target_valence is not None:
+        pts = round(1.0 - abs(user.target_valence - float(song["valence"])), 2)
         score += pts
         reasons.append(f"valence proximity (+{pts:.2f})")
 
-    # Danceability proximity (0–0.75)
-    if "danceability" in user_prefs:
-        pts = round((1.0 - abs(user_prefs["danceability"] - float(song["danceability"]))) * 0.75, 2)
+    # Danceability proximity (0–0.75) — only if set
+    if user.target_danceability is not None:
+        pts = round((1.0 - abs(user.target_danceability - float(song["danceability"]))) * 0.75, 2)
         score += pts
         reasons.append(f"danceability proximity (+{pts:.2f})")
 
-    # Tempo proximity (0–0.5); 150 bpm is the normalisation denominator
-    if "tempo_bpm" in user_prefs:
-        raw = 1.0 - abs(user_prefs["tempo_bpm"] - float(song["tempo_bpm"])) / 150.0
+    # Tempo proximity (0–0.5) — only if set; 150 bpm is the normalisation denominator
+    if user.target_tempo_bpm is not None:
+        raw = 1.0 - abs(user.target_tempo_bpm - float(song["tempo_bpm"])) / 150.0
         pts = round(max(raw, 0.0) * 0.5, 2)
         score += pts
         reasons.append(f"tempo proximity (+{pts:.2f})")
 
     # Acousticness: boolean preference
-    if "likes_acoustic" in user_prefs:
-        acousticness = float(song.get("acousticness", 0))
-        if user_prefs["likes_acoustic"]:
-            pts = round(acousticness * 0.5, 2)
-            score += pts
-            reasons.append(f"acoustic reward (+{pts:.2f})")
-        else:
-            penalty = round(acousticness * -0.25, 2)
-            score += penalty
-            reasons.append(f"acoustic penalty ({penalty:.2f})")
+    acousticness = float(song.get("acousticness", 0))
+    if user.likes_acoustic:
+        pts = round(acousticness * 0.5, 2)
+        score += pts
+        reasons.append(f"acoustic reward (+{pts:.2f})")
+    else:
+        penalty = round(acousticness * -0.25, 2)
+        score += penalty
+        reasons.append(f"acoustic penalty ({penalty:.2f})")
 
     return round(score, 2), reasons
 
 
-def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
+def recommend_songs(user: UserProfile, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
     Required by src/main.py
     """
     scored = [
-        (song, *score_song(user_prefs, song))
+        (song, *score_song(user, song))
         for song in songs
     ]
     ranked = sorted(scored, key=lambda item: item[1], reverse=True)
