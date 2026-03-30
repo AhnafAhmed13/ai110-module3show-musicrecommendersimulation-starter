@@ -59,16 +59,46 @@ Prompts:
 
 ---
 
-## 6. Limitations and Bias 
+## 6. Limitations and Bias
 
-Where the system struggles or behaves unfairly. 
+Where the system struggles or behaves unfairly.
 
-Prompts:  
+### Features it does not consider
 
-- Features it does not consider  
-- Genres or moods that are underrepresented  
-- Cases where the system overfits to one preference  
-- Ways the scoring might unintentionally favor some users  
+**Both versions:** The system has no awareness of artist, popularity, release era, listening history, or context (time of day, activity). Two songs with identical feature vectors are interchangeable — the system cannot tell a beloved classic from an unknown track. It also treats all features as independent; there's no relationship captured between, say, high energy *and* high danceability together (which defines a different feel than either alone).
+
+**Original only:** Because mood was active, the system at least captured emotional tone. With mood disabled in the experiment, emotional nuance disappears entirely — "happy" and "moody" songs are treated as equals.
+
+---
+
+### Genres or moods that are underrepresented
+
+**Both versions:** The `GENRE_RELATED` graph only covers pop, indie pop, synthwave, rock, lofi, ambient, and jazz. Genres like hip-hop, classical, R&B, electronic, and country have no related-genre entries. A fan of any of those genres can only ever earn exact-match genre points — never partial credit for nearby genres.
+
+**Original (worse for this):** The exact genre bonus was +2.0, so an unlisted-genre fan lost twice as many points compared to listed-genre fans when songs were near-misses rather than exact matches.
+
+**Mood side:** `MOOD_RELATED` has no entries for moods like "sad", "angry", "romantic", or "nostalgic". In the original logic, users with those moods got zero mood credit for any song, since neither exact nor related matches existed.
+
+---
+
+### Cases where the system overfits to one preference
+
+**Original:** Genre + mood together dominated scoring (up to +3.5 of ~7.25 max). Users with a matching genre+mood combination got pushed to the top regardless of whether the song's energy, tempo, or valence actually fit. A lofi/chill song could outscore a synthwave/chill song for a lofi fan even if the synthwave song was a much closer match on every continuous dimension.
+
+**Experiment (current):** Energy proximity is worth 0–2.0, the single largest component. The entire ranking effectively becomes an energy-distance sort. Two users with the same `target_energy` but completely different genre/mood preferences receive nearly identical top-5 recommendations.
+
+---
+
+### Ways the scoring might unintentionally favor some users
+
+**Both versions:**
+- **Power users** (all optional fields set) can score up to ~2.25 higher than minimal users. A minimal user whose taste is actually well-represented may rank below a power user whose detailed preferences only weakly align.
+- **`likes_acoustic=True` users** get up to +0.5 from acousticness; `likes_acoustic=False` users only get up to -0.25 penalty. Acoustic songs survive in non-acoustic recommendations more than non-acoustic songs survive in acoustic ones.
+- **Genre graph members** (pop, rock, lofi, jazz fans) get partial credit for related-genre songs. Fans of unlisted genres never do.
+
+**Original additionally favors:** Users whose genre *and* mood both appear in the graph — they earn partial credit on two categorical axes, while an R&B/romantic user earns partial credit on neither.
+
+**Experiment additionally favors:** Users whose musical taste genuinely centers on energy level (workout listeners, EDM fans with consistent high-energy preference). Their `target_energy` is a meaningful signal. Users with inconsistent or contextual energy preferences (varying by mood, time, activity) get poor results because their single `target_energy` value misrepresents them.
 
 ---
 
