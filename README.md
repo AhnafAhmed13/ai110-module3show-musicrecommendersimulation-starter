@@ -209,3 +209,15 @@ A few sentences about what you learned:
 - How did building this change how you think about real music recommenders
 - Where do you think human judgment still matters, even if the model seems "smart"
 
+---
+
+# TF Summary
+
+The core concept is that every recommendation is just a weighted sum: the system has no taste of its own, only the priorities baked into its scoring function.
+
+Students most often struggle when they realize that disabling a feature (like mood matching) or doubling a weight (like energy) can silently break results in ways that look reasonable on the surface, making bugs hard to catch without deliberate test profiles.
+
+AI tools were genuinely useful for generating boilerplate dataclass definitions, but they sometimes suggested overly complex scoring formulas that obscured the pedagogical point — simple, readable math is the goal here, not accuracy.
+They were also misleading when asked about "bias," often jumping to fairness in the social sense before students had grasped the simpler technical bias: a score function that always rewards high energy will push low-energy songs to the bottom regardless of user preference.
+
+To guide a stuck student without giving the answer, ask: "If you set every weight to zero except energy, what would your top-five list look like — and is that what your user actually wants?"
